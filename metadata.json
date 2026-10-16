@@ -1,0 +1,8 @@
+{
+  "name": "FoodWise AI",
+  "description": "AI-powered food inventory intelligence, smart expiry tracking, and zero-waste culinary recipes.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

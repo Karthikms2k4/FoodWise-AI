@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: default-deny all unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Security helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation helper for User Profile
+    function isValidUserProfile(data, userId) {
+      return data.userId == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 120
+        && data.email is string && data.email.size() <= 160;
+    }
+
+    // Validation helper for Food Item
+    function isValidFoodItem(data, userId) {
+      return data.userId == userId
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 120
+        && data.category is string && data.category.size() <= 60
+        && data.location is string && data.location.size() <= 60
+        && data.status is string && (data.status == 'optimal' || data.status == 'expiring_soon' || data.status == 'expired');
+    }
+
+    // Validation helper for Notification
+    function isValidNotification(data, userId) {
+      return data.userId == userId
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 140
+        && data.message is string && data.message.size() <= 400
+        && data.type is string
+        && data.read is bool;
+    }
+
+    // User profile document
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // PII Isolation: No blanket list queries on users
+
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId);
+
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && incoming().userId == existing().userId
+        && isValidUserProfile(incoming(), userId);
+
+      allow delete: if false;
+
+      // Food items subcollection
+      match /foodItems/{itemId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId)
+          && isValidId(itemId)
+          && isValidFoodItem(incoming(), userId);
+
+        allow update: if isOwner(userId)
+          && isValidId(itemId)
+          && incoming().userId == existing().userId
+          && isValidFoodItem(incoming(), userId);
+
+        allow delete: if isOwner(userId) && isValidId(itemId);
+      }
+
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId)
+          && isValidId(notificationId)
+          && isValidNotification(incoming(), userId);
+
+        allow update: if isOwner(userId)
+          && isValidId(notificationId)
+          && incoming().userId == existing().userId
+          && isValidNotification(incoming(), userId);
+
+        allow delete: if isOwner(userId) && isValidId(notificationId);
+      }
+    }
+  }
+}
