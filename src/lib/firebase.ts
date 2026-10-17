@@ -30,10 +30,15 @@ const firebaseConfig = {
 };
 import { FoodItem, UserProfile, AppNotification } from '../types/food';
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = firebaseConfig.firestoreDatabaseId ? getFirestore(app, firebaseConfig.firestoreDatabaseId) : getFirestore(app);
+// Firebase is optional for the public demo. Without valid environment variables,
+// use the app's local sample data instead of crashing during startup.
+export const firebaseEnabled = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
+const app = firebaseEnabled ? initializeApp(firebaseConfig) : null;
+// Keep the exported types stable; callers must check firebaseEnabled before use.
+export const auth = (app ? getAuth(app) : null) as ReturnType<typeof getAuth>;
+export const db = (app
+  ? (firebaseConfig.firestoreDatabaseId ? getFirestore(app, firebaseConfig.firestoreDatabaseId) : getFirestore(app))
+  : null) as ReturnType<typeof getFirestore>;
 export const googleProvider = new GoogleAuthProvider();
 
 // Standard Firestore Error Handling conforming to FirestoreErrorInfo specification
@@ -94,10 +99,13 @@ export async function testConnection() {
     }
   }
 }
-testConnection();
+if (firebaseEnabled) testConnection();
 
 // Authentication helpers
 export async function loginWithGoogle() {
+  if (!firebaseEnabled || !auth) {
+    throw new Error('Firebase is not configured. Add the VITE_FIREBASE_* environment variables to enable sign-in.');
+  }
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
@@ -108,6 +116,7 @@ export async function loginWithGoogle() {
 }
 
 export async function logoutUser() {
+  if (!firebaseEnabled || !auth) return;
   await signOut(auth);
 }
 
