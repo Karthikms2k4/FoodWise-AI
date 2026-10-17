@@ -58,6 +58,7 @@ import {
   updateNotification,
   deleteNotification,
   seedInitialPantryIfEmpty,
+  firebaseEnabled,
 } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
@@ -115,6 +116,15 @@ export default function App() {
 
   // Auth Listener and Firestore Real-Time Subscriptions
   useEffect(() => {
+    if (!firebaseEnabled || !auth) {
+      // Firebase is not configured: keep the sample pantry usable in demo mode.
+      setFirebaseUser(null);
+      setUser(INITIAL_USER);
+      setFoodItems(INITIAL_FOOD_ITEMS);
+      setNotifications(INITIAL_NOTIFICATIONS);
+      return;
+    }
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
 
